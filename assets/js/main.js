@@ -13,6 +13,7 @@ let meFadeStartTime = null;
 let hasSupernovaed = false;
 const supernovaDuration = 2500;
 const meFadeDuration = 800;
+let firstInteractionHandled = false;
 
 
 const meImage = new Image();
@@ -39,6 +40,7 @@ bubbleImage.onload = () => {
 bubbleImage.src = './image/speech-bubble.png';
 
 const dialogues = [
+    'Hello! 👋',
     'Giáng sinh an lành nhé cả nhà ơi!🎄✨',
     'Cảm ơn mọi người vì đã luôn ở bên cạnh và sẻ chia cùng Cường mọi buồn vui trong năm vừa qua. 😍',
     'Chúc mọi người một đêm Noel ấm áp và một năm mới tràn đầy sức khỏe, niềm vui và thật nhiều may mắn.🎉🎊',
@@ -405,6 +407,7 @@ function triggerSupernova() {
 }
 
 function handleClick() {
+    handleFirstInteraction();
     // Prevent spam: only allow when landed
     if (isJumping) return;
 
@@ -426,6 +429,47 @@ function handleClick() {
     }
 
     triggerSupernova();
+}
+
+function handleFirstInteraction() {
+    if (firstInteractionHandled) return;
+    firstInteractionHandled = true;
+
+    // Ensure audio context is unlocked on mobile browsers
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
+    // Try to start playlist immediately after user gesture
+    triggerMusicPlayback();
+}
+
+function triggerMusicPlayback(attempt = 0) {
+    // Cap retries to avoid infinite loops
+    if (attempt > 20) return;
+    if (typeof Amplitude === 'undefined') {
+        setTimeout(() => triggerMusicPlayback(attempt + 1), 100);
+        return;
+    }
+
+    try {
+        Amplitude.setActivePlaylist('christmas-playlist');
+        const playBtn = document.querySelector('.play-pause');
+        const state = typeof Amplitude.getPlayerState === 'function' ? Amplitude.getPlayerState() : null;
+
+        // If play button exists and not already playing, simulate a user click to keep UI in sync
+        if (playBtn && state !== 'playing') {
+            playBtn.click();
+        } else {
+            Amplitude.play();
+        }
+    } catch (e) {
+        // In case Amplitude isn't ready yet, retry shortly
+        setTimeout(() => triggerMusicPlayback(attempt + 1), 150);
+    }
 }
 
 window.addEventListener('mousedown', handleClick);
@@ -470,9 +514,9 @@ function initAmplitudePlayer() {
 
     const songs = [
         {
-            name: 'Santa Tell Me',
+            name: 'All I Want For Christmas Is You',
             artist: 'Christmas Classics',
-            url: './assets/songs/Santa Tell Me.mp3',
+            url: './assets/songs/All I Want For Christmas Is You.mp3',
             cover_art_url: ''
         },
         {
@@ -482,33 +526,33 @@ function initAmplitudePlayer() {
             cover_art_url: ''
         },
         {
-            name: 'Happy Xmas (War Is Over)',
-            artist: 'Christmas Classics',
-            url: './assets/songs/Happy Xmas (War Is Over).mp3',
-            cover_art_url: ''
-        },
-        {
-            name: 'It\'s The Most Wonderful Time Of The Year',
-            artist: 'Christmas Classics',
-            url: './assets/songs/It\'S The Most Wonderful Time Of The Year.mp3',
-            cover_art_url: ''
-        },
-        {
-            name: 'Last Christmas',
+            name: 'Last Christmas (Single Version)',
             artist: 'Christmas Classics',
             url: './assets/songs/Last Christmas (Single Version).mp3',
             cover_art_url: ''
         },
         {
-            name: 'Let It Snow! Let It Snow! Let It Snow!',
+            name: 'Mistletoe',
             artist: 'Christmas Classics',
-            url: './assets/songs/Let It Snow! Let It Snow! Let It Snow!.mp3',
+            url: './assets/songs/Mistletoe.mp3',
             cover_art_url: ''
         },
         {
-            name: 'Merry Christmas Everyone',
+            name: 'Santa Tell Me',
             artist: 'Christmas Classics',
-            url: './assets/songs/Merry Christmas Everyone.mp3',
+            url: './assets/songs/Santa Tell Me.mp3',
+            cover_art_url: ''
+        },
+        {
+            name: 'Snowman',
+            artist: 'Christmas Classics',
+            url: './assets/songs/Snowman.mp3',
+            cover_art_url: ''
+        },
+        {
+            name: 'We Wish You a Merry Christmas',
+            artist: 'Christmas Classics',
+            url: './assets/songs/We Wish You a Merry Christmas.mp3',
             cover_art_url: ''
         },
     ];
@@ -530,9 +574,15 @@ function initAmplitudePlayer() {
                     Amplitude.setSongPlayedPercentage((currentTime / duration) * 100);
                 }
             }
-        }
+        },
+        autoplay: true,
+        start_song: 0
     });
-
+    document.addEventListener('click', function() {
+        if (Amplitude.getPlayerState() !== 'playing') {
+            Amplitude.play();
+        }
+    }, { once: true });
     // Manual event bindings to ensure they work
     const playPauseBtn = document.querySelector('.play-pause');
     const prevBtn = document.querySelector('[data-amplitude-previous]');
